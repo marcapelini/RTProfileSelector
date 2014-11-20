@@ -1,0 +1,43 @@
+
+[RT General]
+CachePath=C:\\Users\\mc\\AppData\\Local\\RawTherapee4.2\\cache
+AppVersion=4.2.1
+ProcParamsVersion=321
+ImageFileName=K:\\Download\\2014\\2014-11-20\\P1090268.RW2
+OutputProfileFileName=K:\\Download\\2014\\2014-11-20\\P1090268.RW2.pp3
+DefaultProcParams=C:\\Users\\mc\\AppData\\Local\\RawTherapee4.2\\profiles\\Natural Sharpless.pp3
+FlaggingMode=false
+
+[Common Data]
+FNumber=4
+Shutter=0.00076923076923076923
+FocalLength=12
+ISO=200
+Lens=Unknown
+Make=Panasonic
+Model=DMC-GM1
+
+[EXIF]
+0017=200
+010f=Panasonic
+0110=DMC-GM1
+0112=Horizontal (normal)
+011a=2
+011b=70, 171, 36, 226...
+011c=638
+8769=$subdir
+
+[EXIF/8769]
+8827=200
+829a=1/1300
+829d=4.0
+8822=Aperture priority
+9000=0230
+9003=2014:11:20 11:38:12
+9004=2014:11:20 11:38:12
+9204=+0.00
+9205=3.5
+9207=Pattern
+9209=Flash did not fire, compulsory flash mode
+920a=12.0
+a300=3
