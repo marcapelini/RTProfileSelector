@@ -5,18 +5,18 @@
 ## Release
 ProjectName            :=RTProfileSelector
 ConfigurationName      :=Release
-WorkspacePath          := "/home/mc/Development/Code/bitbucket/rtprofileselector/source"
-ProjectPath            := "/home/mc/Development/Code/bitbucket/rtprofileselector/source"
+WorkspacePath          := "/home/mc/Development/Code/bitbucket/rtps/source"
+ProjectPath            := "/home/mc/Development/Code/bitbucket/rtps/source"
 IntermediateDirectory  :=./Release
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=mc
-Date                   :=11/20/14
+Date                   :=11/22/14
 CodeLitePath           :="/home/mc/.codelite"
-LinkerName             :=/usr/bin/g++-4.8 
-SharedObjectLinkerName :=/usr/bin/g++-4.8 -shared -fPIC
+LinkerName             :=/usr/bin/g++ 
+SharedObjectLinkerName :=/usr/bin/g++ -shared -fPIC
 ObjectSuffix           :=.o
 DependSuffix           :=.o.d
 PreprocessSuffix       :=.i
@@ -48,8 +48,8 @@ LibPath                := $(LibraryPathSwitch).
 ## AR, CXX, CC, AS, CXXFLAGS and CFLAGS can be overriden using an environment variables
 ##
 AR       := /usr/bin/ar rcu
-CXX      := /usr/bin/g++-4.8 
-CC       := /usr/bin/gcc-4.8 
+CXX      := /usr/bin/g++ 
+CC       := /usr/bin/gcc 
 CXXFLAGS :=  -O2 -Wall -std=c++0x $(Preprocessors)
 CFLAGS   :=  -O2 -Wall $(Preprocessors)
 ASFLAGS  := 
@@ -88,7 +88,7 @@ PreBuild:
 ## Objects
 ##
 $(IntermediateDirectory)/RTProfileSelector.cpp$(ObjectSuffix): RTProfileSelector.cpp $(IntermediateDirectory)/RTProfileSelector.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/mc/Development/Code/bitbucket/rtprofileselector/source/RTProfileSelector.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/RTProfileSelector.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/mc/Development/Code/bitbucket/rtps/source/RTProfileSelector.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/RTProfileSelector.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/RTProfileSelector.cpp$(DependSuffix): RTProfileSelector.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/RTProfileSelector.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/RTProfileSelector.cpp$(DependSuffix) -MM "RTProfileSelector.cpp"
 

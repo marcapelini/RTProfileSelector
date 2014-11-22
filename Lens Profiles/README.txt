@@ -8,6 +8,12 @@ the "Lens Type" field instead. Note that fixed lens cameras (e.g. compact
 cameras) usually don't have a "Lens ID", so in this case you will have to 
 use the "Camera Model Name" field as the file name for the lens profile file.
 
+A lens profile filename must be prefixed with "lens." (lower case).  
+Examples:
+
+- lens.LUMIX G 20mm F1.7.ini
+- lens.DML-LX5.ini
+
 This "lens profile" feature is meant as a quick-and-dirty solution for achieving 
 some level of automatic lens correction in RT, in case you can't find a good 
 LCP lens profile for your lens, and would rather not bother making your own. :)
@@ -25,7 +31,7 @@ in a file named for the lens ID (or camera, if its a fixed-lens camera) and
 with a .ini extension. 
 
 Example for the Panasonic Lumix PZ 14-42 F3.5/5.6 lens. Contents of 
-file "LUMIX G VARIO PZ 14-42mm F3.5-5.6.ini"
+file "lens.LUMIX G VARIO PZ 14-42mm F3.5-5.6.ini"
 
 	[Distortion]
 	14=-0.150

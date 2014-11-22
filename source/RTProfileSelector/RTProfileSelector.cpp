@@ -335,7 +335,7 @@ bool getDistortionAmount(const string& basePath, const StrMap& exifFields, strin
 	// let's get the lens ID first from Exif
 	StrMap::const_iterator lensIdIter = exifFields.find("Lens ID");		
 	if (lensIdIter == exifFields.cend())
-		// I noticed there's also a "Lens Type" fields, don't know which is best or standard
+		// I noticed there's also a "Lens Type" field, don't know which is best or standard
 		lensIdIter = exifFields.find("Lens Type");			
 	if (lensIdIter == exifFields.cend())
 		// ok, couldn't find lens id, lets fall back to "Camera Model" (might be a compact/fixed lens camera...)
@@ -343,8 +343,8 @@ bool getDistortionAmount(const string& basePath, const StrMap& exifFields, strin
 
 	string lensId = lensIdIter->second;				// here we have the "lens id" (or whatever)
 
-	// looks for distortion section for this lens' INI file
-	IniMap lensProfileIni = readIni(basePath + "Lens Profiles" + SLASH_CHAR + lensId + ".ini");
+	// looks for distortion section for this lens' INI file: ./Lens Profiles/lens.<Lens ID>.ini
+	IniMap lensProfileIni = readIni(basePath + "Lens Profiles" + SLASH_CHAR + "lens." + lensId + ".ini");
 	if (lensProfileIni.empty())
 		return false;
 
