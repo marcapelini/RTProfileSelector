@@ -8,11 +8,11 @@ the "Lens Type" field instead. Note that fixed lens cameras (e.g. compact
 cameras) usually don't have a "Lens ID", so in this case you will have to 
 use the "Camera Model Name" field as the file name for the lens profile file.
 
-A lens profile filename must be prefixed with "lens." (lower case).  
+A lens profile file name must be prefixed with "lens." (lower case).  
 Examples:
 
 - lens.LUMIX G 20mm F1.7.ini
-- lens.DML-LX5.ini
+- lens.DMC-LX5.ini
 
 This "lens profile" feature is meant as a quick-and-dirty solution for achieving 
 some level of automatic lens correction in RT, in case you can't find a good 
@@ -52,7 +52,7 @@ These files are just for reference on how you can write your own simple
 correction profiles for any lens you have. 
 
 RTProfileSelector will try to find the best match for the actual focal length
-recorded in the RAW file. If no matching FL is found in the "[Distortion]", 
+recorded in the raw file. If no matching FL is found in the "[Distortion]", 
 section, RTProfileSelector will interpolate over the nearest values. If the 
 actual focal length is below the minimum or above the maximum in the range, 
 RTProfileSelector will just use the value from the nearest FL.
