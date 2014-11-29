@@ -1,0 +1,67 @@
+
+[Version]
+AppVersion=4.2.30
+Version=321
+
+[Sharpening]
+Enabled=false
+Method=rld
+Radius=0.5
+Amount=200
+Threshold=20;80;2000;1200;
+OnlyEdges=false
+EdgedetectionRadius=1.8999999999999999
+EdgeTolerance=1800
+HalocontrolEnabled=false
+HalocontrolAmount=85
+DeconvRadius=0.75
+DeconvAmount=41
+DeconvDamping=20
+DeconvIterations=30
+
+[SharpenEdge]
+Enabled=false
+Passes=2
+Strength=50
+ThreeChannels=false
+
+[SharpenMicro]
+Enabled=false
+Matrix=false
+Strength=20
+Uniformity=50
+
+[Impulse Denoising]
+Enabled=false
+Threshold=50
+
+[Directional Pyramid Denoising]
+Enabled=true
+Enhance=false
+Median=false
+Auto=false
+Luma=0
+Ldetail=66.939999999999998
+Chroma=9.5
+Method=RGB
+LMethod=CUR
+CMethod=MAN
+C2Method=MANU
+SMethod=shal
+MedMethod=soft
+RGBMethod=soft
+MethodMed=Lonly
+Redchro=0
+Bluechro=0
+Gamma=1.7
+Passes=1
+LCurve=1;0.01296296296296298;0.32037037037037058;0.34999999999999998;0.34999999999999998;0.6092592592592585;0.040000000000000001;0.34999999999999998;0.34999999999999998;
+CCCurve=1;0.050000000000000003;0.5;0.34999999999999998;0.34999999999999998;0.34999999999999998;0.050000000000000003;0.34999999999999998;0.34999999999999998;
+
+[RAW Bayer]
+Method=igv
+CcSteps=1
+
+[RAW X-Trans]
+Method=3-pass (best)
+CcSteps=0
