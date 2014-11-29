@@ -62,6 +62,7 @@ typedef std::pair<string, string> StrPair;
 #ifdef _WIN32
 // Slash char for Windows
 #define SLASH_CHAR				'\\'	
+#define REVERSE_SLASH_CHAR				'/'	
 // Out of convenience, for Windows we assume the user may have copied the exiftool binary to RTProfileSelector's folder
 #define DEFAULT_EXIFTOOL_CMD	(basePath + "exiftool")
 // Default text viewer for Windows = Notepad
@@ -69,6 +70,7 @@ typedef std::pair<string, string> StrPair;
 #else
 // Slash char for *nix
 #define SLASH_CHAR				'/'
+#define REVERSE_SLASH_CHAR				'\\'	
 // Exiftool is simply exiftool
 #define DEFAULT_EXIFTOOL_CMD	("exiftool")
 // Default text viewer for Ubuntu = Gedit
@@ -284,6 +286,23 @@ string filterDoubleSlashes(const string& path)
 	{
 		result.replace(pos, doubleSlash.length(), singleSlash);
 		pos += singleSlash.length();
+	}
+
+	return result;
+}
+
+// Converts any of the reverse slash char (for Windows: '/', for *nix:'\') to the current OS path slash
+string convertoToCurrentOSPath(const string& path)
+{
+	string result = path;
+	string currentSlash = { SLASH_CHAR };
+	string reverseSlash = { REVERSE_SLASH_CHAR };
+	size_t pos = 0;
+
+	while ((pos = result.find(reverseSlash, pos)) != string::npos)
+	{
+		result.replace(pos, 1, currentSlash);
+		pos += 1;
 	}
 
 	return result;
@@ -550,6 +569,9 @@ bool getISOPartialProfile(const string& basePath, const string& rtCustomProfiles
 	// check that there's a non-empty .pp3 name
 	if (isoProfileName.empty())
 		return false;
+
+	// makes sure any reverse slash is converted to current OS slash
+	isoProfileName = convertoToCurrentOSPath(isoProfileName);
 
 	// first look for .pp3 file in RT's custom profiles folder
 	IniMap partialIsoIni = readIni(rtCustomProfilesPath + SLASH_CHAR + isoProfileName);
