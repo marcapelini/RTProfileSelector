@@ -31,7 +31,9 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
+#include <set>
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -54,6 +56,9 @@ typedef std::map<string, string> StrMap;
 typedef std::map<string, StrMap> IniMap;
 typedef std::multimap<string, StrMap> IniMultiMap;
 typedef std::pair<string, string> StrPair;
+typedef std::set<string> StrSet;
+typedef std::pair<string, StrSet> StrSetPair;
+typedef std::vector<StrSetPair> StrSetVector;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,6 +100,8 @@ typedef std::pair<string, string> StrPair;
 // PP3 file constants
 #define PP3_DISTORTION_SECTION		"Distortion"
 #define PP3_DISTORTION_AMOUNT		"Amount"
+#define PP3_LENS_PROFILE_SECTION	"LensProfile"
+#define PP3_LENS_PROFILE_KEY		"LCPFile"
 
 // RT's keyfile definitions
 #define RT_KEYFILE_GENERAL_SECTION	"RT General"
@@ -106,6 +113,12 @@ typedef std::pair<string, string> StrPair;
 // RTPS's ini-file definitions
 #define RTPS_INI_SECTION_GENERAL	"General"
 #define RTPS_INI_SECTION_ISO		"ISO Profile Sections"
+
+// Partial profiles reules specific keys
+#define RTPS_RULES_PRIVATE_KEY_CHAR	'@'
+#define RTPS_RULES_PP3_SECTIONS_KEY	"@Sections"
+#define RTPS_RULES_SECT_WILDCARD	"*"
+#define RTPS_RULES_PROFILE_RANK		"@Rank"
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -275,7 +288,7 @@ double eval(const string& str, double defaultValue)
 }
 
 // Removes double slashes ("\\") from path values read from RT's keyfile on Windows
-string filterDoubleSlashes(const string& path)
+string removeDoubleSlashes(const string& path)
 {
 	string result = path;
 	string doubleSlash = { SLASH_CHAR, SLASH_CHAR };
@@ -289,6 +302,32 @@ string filterDoubleSlashes(const string& path)
 	}
 
 	return result;
+}
+
+// Adds double slashes ("\\") to path values that are to be written to .pp3 files
+string addDoubleSlashes(const string& path)
+{
+	string result = path;
+
+#ifdef _WIN32
+	string doubleSlash = { SLASH_CHAR, SLASH_CHAR };
+	string singleSlash = { SLASH_CHAR };
+	size_t pos = 0;
+
+	while ((pos = result.find(singleSlash, pos)) != string::npos)
+	{
+		result.replace(pos, singleSlash.length(), doubleSlash);
+		pos += doubleSlash.length();
+	}
+#endif
+
+	return result;
+}
+
+// Prepares path string for output in .PP3-compatible format
+string adjustRTOutputSlashes(const string& path)
+{
+	return addDoubleSlashes(removeDoubleSlashes(path));
 }
 
 // Converts any of the reverse slash char (for Windows: '/', for *nix:'\') to the current OS path slash
@@ -480,25 +519,38 @@ bool matchValue(const string& exifValue, const string& ruleValue, bool useComple
 	return matched;
 }
 
-// Matches all parameter definition sections from RTProfileSelectorRules.ini against the Exif fields from the raw file
+// Matches full profiles parameter definition sections from RTProfileSelectorRules.ini against the Exif fields from the raw file
 IniMultiMap::const_iterator matchExifFields(const IniMultiMap &rtSelectorRulesIni, const StrMap &exifFields, bool useComplexRules)
 {
 	IniMultiMap::const_iterator matchIter = rtSelectorRulesIni.cend();		// iterator to matching section 
 	std::vector<IniMultiMap::const_iterator> matches;						// full-matches found
 
-	// let's check all profile sections for matches
+	// let's check all full profile sections for matches
 	for (auto section = rtSelectorRulesIni.begin(); section != rtSelectorRulesIni.end(); ++section)
 	{
-		size_t matchedKeys = 0;									// matched keys count for current section
-		for (const StrPair &keyVal : section->second)			// checks all keys in the current section
+		const StrMap& keys = section->second;
+		// look for "@Sections" key, present in partial profile rules only 
+		auto sectionsKey = keys.find(RTPS_RULES_PP3_SECTIONS_KEY);
+		if (sectionsKey != keys.end())						// skip partial profiles
+			continue;
+
+		size_t matchedKeys = 0;								// matched keys count for current section
+		size_t privateKeys = 0;						// private RTPS keys begin with '@'
+		for (const StrPair &keyVal : section->second)		// checks all keys in the current section
 		{
-			auto field = exifFields.find(keyVal.first);			// key found in Exif
+			if (keyVal.first[0] == RTPS_RULES_PRIVATE_KEY_CHAR)				// skip private RTPS Keys
+			{
+				++privateKeys;
+				continue;
+			}
+
+			auto field = exifFields.find(keyVal.first);		// key found in Exif
 			// check if value from Exif matches definition from rule
 			if (field != exifFields.end() && matchValue(field->second, keyVal.second, useComplexRules))	
 				++matchedKeys;
 		}
-		// only save the ones that had all keys matched
-		if (matchedKeys != 0 && matchedKeys == section->second.size())
+		// save only the ones that had all keys matched
+		if (matchedKeys != 0 && matchedKeys == section->second.size() - privateKeys)
 			matches.push_back(section);
 	}
 
@@ -517,12 +569,150 @@ IniMultiMap::const_iterator matchExifFields(const IniMultiMap &rtSelectorRulesIn
 	return matchIter;
 }
 
+// Matches partial profiles parameter definition sections from RTProfileSelectorRules.ini against the Exif fields from the raw file
+StrSetVector getPartialProfilesMatches(const IniMap& rtSelectorIni, const IniMultiMap &rtSelectorRulesIni, const StrMap &exifFields, bool useComplexRules)
+{
+	std::vector<IniMultiMap::const_iterator> matches;						// full-matches found
+
+	// let's check all parttial profile sections for matches
+	for (auto section = rtSelectorRulesIni.begin(); section != rtSelectorRulesIni.end(); ++section)
+	{
+		const StrMap& keys = section->second;
+		// look for "@Sections" key, present in partial profile rules only 
+		auto sectionsKey = keys.find(RTPS_RULES_PP3_SECTIONS_KEY);
+		if (sectionsKey == keys.end())				// allow only partial profiles
+			continue;
+
+		size_t matchedKeys = 0;						// matched keys count for current section
+		size_t privateKeys = 0;						// private RTPS keys begin with '@'
+		for (const StrPair &keyVal : keys)			// checks all keys in the current section
+		{
+			if (keyVal.first[0] == RTPS_RULES_PRIVATE_KEY_CHAR)				// skip private RTPS Keys
+			{
+				++privateKeys;
+				continue;
+			}
+
+			auto field = exifFields.find(keyVal.first);			// key found in Exif
+			// check if value from Exif matches definition from rule
+			if (field != exifFields.end() && 
+				 matchValue(field->second, keyVal.second, useComplexRules))
+				++matchedKeys;
+		}
+		// only save the ones that had all keys matched
+		if (matchedKeys != 0 && matchedKeys == section->second.size() - privateKeys)
+			matches.push_back(section);
+	}
+
+	StrSetVector partialProfiles;
+	if (!matches.empty())
+	{
+		// sorts matching profiles according to rank
+		std::sort(begin(matches), end(matches),
+			[](const IniMultiMap::const_iterator& prof1, const IniMultiMap::const_iterator& prof2)->bool
+			{
+				auto rankIter1 = prof1->second.find(RTPS_RULES_PROFILE_RANK);
+				auto rankIter2 = prof2->second.find(RTPS_RULES_PROFILE_RANK);
+				
+				int rank1 = atoi(rankIter1 == prof1->second.end() ? "0" : rankIter1->second.c_str());
+				int rank2 = atoi(rankIter2 == prof2->second.end() ? "0" : rankIter2->second.c_str());
+
+				return rank1 < rank2;	// highest rank profile must be applied last
+			}
+		);
+
+		// get pp3 sections to be applied for each matching profile
+		for (auto &matchIter : matches)
+		{
+			string pp3Name = matchIter->first;
+
+			// get profile section set
+			auto profileIter = std::find_if(partialProfiles.begin(), partialProfiles.end(), 
+				[&pp3Name](const StrSetPair& item)
+				{
+					return item.first == pp3Name;
+				}
+			);
+			if (profileIter == partialProfiles.end())
+			{
+				partialProfiles.push_back(StrSetPair(pp3Name, StrSet()));
+				profileIter = std::prev(partialProfiles.end());
+			}
+
+			StrSet& pp3Sections = profileIter->second;
+			auto sectionsValue = matchIter->second.find(RTPS_RULES_PP3_SECTIONS_KEY);
+			string section;
+			std::stringstream ss(sectionsValue->second);
+			while (std::getline(ss, section, ','))
+			{
+				// wildcard: use any sections found in the partial profile
+				if (section == RTPS_RULES_SECT_WILDCARD)			
+				{
+					pp3Sections.clear();
+					pp3Sections.insert(section);
+					break;
+				}
+				// its an expansion list section: retrieve actual list from RTProfileSelector.ini
+				else if (section[0] == '[' && section[section.length()-1] == ']')	
+				{
+					IniMap::const_iterator sectionsIter = rtSelectorIni.find(section.substr(1, section.length()-2));
+					if (sectionsIter != rtSelectorIni.cend())
+					{
+						for (auto &entry : sectionsIter->second)
+						{
+							if (entry.second == "1")				// section is enabled?
+								pp3Sections.insert(entry.first);	// add to profile
+						}
+					}
+				}
+				else
+				{											
+					pp3Sections.insert(section);			// it's a simple section name => just insert it
+				}
+			}
+		}	
+	}
+
+	return std::move(partialProfiles);
+}
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Functions for application of partial profiles after the default profile has  been selected
 //
 
-// gets partial profile based on ISO
+// fills profile sections from rules-based partial profiles
+bool getRulesPartialProfiles(   const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, 
+								const StrMap& exifFields, const StrSetVector& partialProfilesList, IniMap& partialProfile)
+{
+	// for each partial profile, read sections and values
+	for (auto &profileItem : partialProfilesList)
+	{
+		// read pp3 file
+		IniMap pp3Ini = readIni(rtCustomProfilesPath + SLASH_CHAR + profileItem.first);
+		if (pp3Ini.empty())
+			continue;
+
+		// filter for which sections are to be copied
+		const StrSet& filterSections = profileItem.second;
+		bool copyAllSections = filterSections.find(RTPS_RULES_SECT_WILDCARD) != filterSections.end();
+
+		// copy sections from .pp3 profile to partial profile map
+		for (auto& section : pp3Ini)
+		{
+			if (copyAllSections ||											// all sections are to be copied
+				filterSections.find(section.first) != filterSections.end())	// filter => copy only enabled sections
+			{
+				partialProfile[section.first] = std::move(section.second);	// transfer whole section to destination profile
+			}
+		}
+	}
+
+	return true;
+}
+
+// fills profile sections from ISO-based profiles
 bool getISOPartialProfile(const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, const StrMap& exifFields, IniMap& partialProfile)
 {
 	// let's find camera model and ISO setting 
@@ -608,25 +798,53 @@ bool getISOPartialProfile(const string& basePath, const string& rtCustomProfiles
 // "lens profile" INI file
 bool getLensPartialProfile(const string& basePath, const StrMap& exifFields, IniMap& partialProfile)
 {
+	// map with lens profile entries
+	IniMap lensProfileIni;
+
 	// let's get the lens ID first from Exif
 	StrMap::const_iterator lensIdIter = exifFields.find(EXIF_LENS_ID);
-	if (lensIdIter == exifFields.cend())
-		// I noticed there's also a "Lens Type" field, don't know which is best or standard
+
+	// I noticed there's also a "Lens Type" field, don't know which is best or standard
+	if (lensIdIter == exifFields.cend())		
 		lensIdIter = exifFields.find(EXIF_LENS_TYPE);
-	if (lensIdIter == exifFields.cend())
-		// ok, couldn't find lens id, lets fall back to "Camera Model" (might be a compact/fixed lens camera...)
-		lensIdIter = exifFields.find(EXIF_CAMERA_MODEL);
 
-	string lensId = lensIdIter->second;				// here we have the "lens id" (or whatever)
+	// flag to mark whether we've already tried "camera model" ini file (fall back in case no valid lens key found)
+	bool triedCameraModel = false;
 
-	// looks for distortion section for this lens' INI file: ./Lens Profiles/lens.<Lens ID>.ini
-	IniMap lensProfileIni = readIni(basePath + LENS_PROFILE_DIR + SLASH_CHAR + "lens." + lensId + ".ini");
-	if (lensProfileIni.empty())
-		return false;
+	// try to read lens INI file
+	while (lensProfileIni.empty())
+	{
+		// look for lens' INI file: ./Lens Profiles/lens.<Lens ID>.ini
+		if (lensIdIter != exifFields.cend())
+			lensProfileIni = readIni(basePath + LENS_PROFILE_DIR + SLASH_CHAR + "lens." + lensIdIter->second + ".ini");
+		if (lensProfileIni.empty())
+		{
+			if (triedCameraModel)
+			{	// have already tried "camera model" => no valid profile INI found
+				return false;	
+			}
+			else
+			{	// lens INI not found (or empty), let's try "camera model" instead
+				triedCameraModel = true;
+				lensIdIter = exifFields.find(EXIF_CAMERA_MODEL);
+			}
+		}
+	} 
+
+	// look for RT's [LensProfile] section
+	IniMap::iterator lensProfileSection = lensProfileIni.find(PP3_LENS_PROFILE_SECTION);
+	if (lensProfileSection != lensProfileIni.cend() && !lensProfileSection->second.empty())
+	{
+		auto lcpfile = lensProfileSection->second.find(PP3_LENS_PROFILE_KEY);
+		if (lcpfile != lensProfileSection->second.end())
+			lcpfile->second = adjustRTOutputSlashes(lcpfile->second);
+		partialProfile[PP3_LENS_PROFILE_SECTION] = lensProfileSection->second;
+		return true;
+	}
 
 	// locate [Distortion] section
-	IniMap::const_iterator lensProfileSection = lensProfileIni.find(PP3_DISTORTION_SECTION);
-	if (lensProfileSection == lensProfileIni.cend() || lensProfileSection->second.empty())
+	IniMap::const_iterator lensDistortionSection = lensProfileIni.find(PP3_DISTORTION_SECTION);
+	if (lensDistortionSection == lensProfileIni.cend() || lensDistortionSection->second.empty())
 		return false;
 
 	// now looks for focal length
@@ -648,7 +866,7 @@ bool getLensPartialProfile(const string& basePath, const StrMap& exifFields, Ini
 
 	// convert all values to double for proper sorting and maths
 	std::map<double, double> flDistortionValues;
-	for (const auto& i : lensProfileSection->second)
+	for (const auto& i : lensDistortionSection->second)
 		flDistortionValues[std::stod(i.first)] = std::stod(i.second);
 
 	double amount = 0;
@@ -692,16 +910,20 @@ bool getLensPartialProfile(const string& basePath, const StrMap& exifFields, Ini
 }
 
 // Applies partial profiles to the selected destination profile
-// Currently partial information comes either from lens-based distortion profile, or Camera/ISO based partial profiles
-void applyPartialProfiles(const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, const StrMap& exifFields, const string& profileFileName)
+// Currently partial information comes partial rules, lens-based distortion profile, or Camera/ISO based partial profiles
+void applyPartialProfiles(  const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, 
+							const StrMap& exifFields, const StrSetVector& partialProfilesList, const string& profileFileName)
 {
 	// map of partial settings 
 	IniMap partialProfile;
 
-	// first partial profile: ISO-specific partial profile
+	// first: partial profiles matched from rules
+	getRulesPartialProfiles(basePath, rtCustomProfilesPath, rtSelectorIni, exifFields, partialProfilesList, partialProfile);
+
+	// second: ISO-specific partial profile
 	getISOPartialProfile(basePath, rtCustomProfilesPath, rtSelectorIni, exifFields, partialProfile);
 	
-	// second partial profile: distortion amount for current lens and focal length
+	// third: distortion amount for current lens and focal length
 	getLensPartialProfile(basePath, exifFields, partialProfile);
 
 	string tempFileName = profileFileName + ".tmp";
@@ -751,12 +973,6 @@ void applyPartialProfiles(const string& basePath, const string& rtCustomProfiles
 //
 int main(int argc, const char* argv[])
 {
-	if (argc < 2)
-	{
-		// not enough parameters
-		return 1;
-	}
-
 	// save program base path 
 	string basePath = argv[0];
 	size_t slash = basePath.find_last_of(SLASH_CHAR);
@@ -768,16 +984,27 @@ int main(int argc, const char* argv[])
 	// just for simple logging/debugging
 	std::ofstream log(basePath + "RTProfileSelector.log");
 
+	if (argc < 2)
+	{
+		// not enough parameters
+		log << "\nNot enough parameters" << std::endl;
+		return 1;
+	}
+
 	// reads profile selection configuration file
 	IniMap rtSelectorIni = readIni(basePath + "RTProfileSelector.ini");
 	// reads RT's params for profile selection
 	IniMap rtProfileParams = readIni(argv[1]);
 
+	log << "\nRT key file: " << argv[1]	<< std::endl;
+	if (rtProfileParams.empty())
+		log << "\nEmpty key file!" << std::endl;
+
 	// necessary parameters for current raw file
-	string imageFileName = filterDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["ImageFileName"]);
-	string outputProfileFileName = filterDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["OutputProfileFileName"]);
-	string cachePath = filterDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["CachePath"]);
-	string defaultProcParams = filterDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["DefaultProcParams"]);
+	string imageFileName = removeDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["ImageFileName"]);
+	string outputProfileFileName = removeDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["OutputProfileFileName"]);
+	string cachePath = removeDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["CachePath"]);
+	string defaultProcParams = removeDoubleSlashes(rtProfileParams[RT_KEYFILE_GENERAL_SECTION]["DefaultProcParams"]);
 	slash = defaultProcParams.find_last_of(SLASH_CHAR);
 
 	// all parameters found in RT's parameter file?
@@ -805,9 +1032,15 @@ int main(int argc, const char* argv[])
 	// reads Exif file into map 
 	StrMap exifFields = getExifFields(exiftool, cachePath, imageFileName, log);
 
-	if (!exifFields.empty())
+	// Exif-matched partial profiles list
+	StrSetVector partialProfilesList;
+	if (exifFields.empty())
 	{
-		// if ViewExifKeys is enabled, we generate and open a KEY=VALUE text file
+		log << "\nCould not read Exif keys from image file: " << imageFileName << std::endl;
+	}
+	else
+	{
+		// if ViewExifKeys is enabled, generate and open a KEY=VALUE text file
 		if (rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ViewExifKeys"] == "1")
 		{
 			// check whether a specific viewer is defined in the configuration file
@@ -819,7 +1052,7 @@ int main(int argc, const char* argv[])
 			showExifFields(exifFields, exifViewerCmd, imageFileName, cachePath + SLASH_CHAR + "exif_fields.txt");
 		}
 
-		// checks all profile selection rules for a match against the Exif values
+		// check all profile selection rules for a match against the Exif values
 		bool useComplexRules = rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ComplexRulesEnabled"] != "0";
 		IniMultiMap rtSelectorRulesIni = readMultiIni(basePath + "RTProfileSelectorRules.ini");
 		auto match = matchExifFields(rtSelectorRulesIni, exifFields, useComplexRules);
@@ -827,9 +1060,11 @@ int main(int argc, const char* argv[])
 		{	// we have found a profile matching the Exif values
 			sourceProfile = rtCustomProfilesPath + SLASH_CHAR + match->first;
 		}
+		// get matches for partial profiles
+		partialProfilesList = getPartialProfilesMatches(rtSelectorIni, rtSelectorRulesIni, exifFields, useComplexRules);
 	}
 
-	// copy matching profile as the raw's file RT profile
+	// copy matching profile as the raw file's RT profile
 	if (!copyFile(sourceProfile, outputProfileFileName))
 	{
 		log << "\nError copying source -> destination profile:" << std::endl;
@@ -838,8 +1073,8 @@ int main(int argc, const char* argv[])
 	}
 	log << "\nSuccessfuly copied  profile:" << sourceProfile << " -> " << outputProfileFileName << std::endl;
 
-	// as a last step, lest try to apply partial profiles (lens or ISO-dependent)
-	applyPartialProfiles(basePath, rtCustomProfilesPath, rtSelectorIni, exifFields, outputProfileFileName);
+	// last step: apply any partial profiles (partial rules, lens or ISO-dependent) 
+	applyPartialProfiles(basePath, rtCustomProfilesPath, rtSelectorIni, exifFields, partialProfilesList, outputProfileFileName);
 
 	return 0;
 }
