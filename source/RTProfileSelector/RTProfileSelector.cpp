@@ -98,6 +98,7 @@ typedef std::vector<StrSetPair> StrSetVector;
 #define EXIF_FOCAL_LENGTH			"Focal Length"
 
 // PP3 file constants
+#define PP3_VERSION_SECTION			"Version"
 #define PP3_DISTORTION_SECTION		"Distortion"
 #define PP3_DISTORTION_AMOUNT		"Amount"
 #define PP3_LENS_PROFILE_SECTION	"LensProfile"
@@ -926,6 +927,10 @@ void applyPartialProfiles(  const string& basePath, const string& rtCustomProfil
 	// third: distortion amount for current lens and focal length
 	getLensPartialProfile(basePath, exifFields, partialProfile);
 
+	// will get [Version]  section from main profile
+	partialProfile.erase(PP3_VERSION_SECTION);
+
+	std::set<string> mergedPP3Sections;					// sections merged from partial profile
 	string tempFileName = profileFileName + ".tmp";
 	std::ofstream tempFile(tempFileName);
 	std::ifstream profileFile(profileFileName);
@@ -933,21 +938,12 @@ void applyPartialProfiles(  const string& basePath, const string& rtCustomProfil
 	while (std::getline(profileFile, line))
 	{
 		removeReturnChar(line);
-		if (parseSection(line, section))		// it's a section
+		if (parseSection(line, section))				// it's a section
 		{
 			// looks for a section of the same name in the partial profile
 			auto sectionFromPartial = partialProfile.find(section);
 			if (sectionFromPartial != partialProfile.end())
-			{
-				tempFile << line << "\n";	// copy original line to output
-				// section found in partial profile => copy all entries to destination file
-				// note: since we're dumping a map, entries will be sorted by key, which is probably
-				// not the same order they were in the original partial .pp3 file.  Shouldn't be a problem 
-				// if RT just reads by key and doesn't care about ordering 
-				for (const StrPair& entryFromPartial : sectionFromPartial->second)
-					tempFile << entryFromPartial.first << "=" << entryFromPartial.second << "\n";
-				tempFile << "\n";
-
+			{	
 				// prevents any entries from original section from being copied
 				section.clear();
 				continue;
@@ -955,6 +951,16 @@ void applyPartialProfiles(  const string& basePath, const string& rtCustomProfil
 		}
 		if (!section.empty())
 			tempFile << line << "\n";	// copy original line to output
+	}
+	tempFile << "\n";
+
+	// insert sections from partial profile
+	for (auto& section : partialProfile)
+	{
+		tempFile << "[" << section.first << "]\n";						// [section name]
+		for (auto& entry : section.second)
+			tempFile << entry.first << "=" << entry.second << "\n";		// key=value
+		tempFile << "\n";
 	}
 
 	// replaces original profile file with the temp file where one we applied the corrected distortion amount
