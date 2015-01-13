@@ -1,7 +1,12 @@
-# RTProfileSelector #
+## RTProfileSelector #
 
-### RTProfileSelector is a [RawTherapee](http://rawtherapee.com/) plugin that automatically selects custom processing profiles (*.pp3* files) based on user-defined rules.  The rules are sets of Exif fields and values which are matched against the actual values extracted from the raw files. RTProfileSelector uses [ExifTool](http://www.sno.phy.queensu.ca/~phil/exiftool/) for extracting metadata from images.
+RTProfileSelector is a [RawTherapee](http://rawtherapee.com/) plugin that automatically selects custom processing profiles (.pp3 files) based on user-defined rules. The rules are sets of Exif fields and values which are matched against the actual values extracted from the raw files the first time they are opened in RawTherapee.  
 
-### Besides processing profile selection based on comparison of Exif fields, RTProfileSelector can currently also apply lens and focal length specific distortion correction if supplied with simple user defined "lens profiles".
+A few things you can automatise in RawTherapee through RTProfileSelector:
+* Assign your own custom processing profiles to approximatelly match your camera settings (such as "monochrome"/"black & white", "vivid colour", "film modes", etc.)
+* Set noise reduction parameters in RawTherapee according to camera model and ISO value
+* Assign lens correction profiles (LCP) based on the lens and camera model used
 
-### For information on how to install and use RTProfileSelector, have a look at the tutorials in the [wiki section](https://github.com/marcapelini/RTProfileSelector/wiki).
+RTProfileSelector is written in C++11 and compiles on both Windows and Linux. RTProfileSelector uses [ExifTool](http://www.sno.phy.queensu.ca/~phil/exiftool/) for extracting metadata from images.
+
+For installation procedures and online documentation, please go to the project's [wiki section](https://github.com/marcapelini/RTProfileSelector/wiki).
