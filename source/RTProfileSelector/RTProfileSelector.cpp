@@ -38,6 +38,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <codecvt>
+#include <locale>
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Hate this, but had to use CreateProcess() (see executeProcess() below) to get
@@ -59,6 +61,9 @@ typedef std::pair<string, string> StrPair;
 typedef std::set<string> StrSet;
 typedef std::pair<string, StrSet> StrSetPair;
 typedef std::vector<StrSetPair> StrSetVector;
+
+// default locale for UTF-8 conversions
+std::locale defaultLocale;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -126,6 +131,21 @@ typedef std::vector<StrSetPair> StrSetVector;
 // Utility functions for dealing with INI-styled files
 //
 
+// convert UTF-8 string to current locale single-byte string
+void utf8ToString(string& utf8str)
+{
+	// code below doesn't work with empty strings...
+	if (utf8str.empty())
+		return;
+	// UTF-8 to wstring
+	std::wstring_convert<std::codecvt_utf8<wchar_t>> wconv;
+	std::wstring wstr = wconv.from_bytes(utf8str);
+	// wstring to string
+	std::vector<char> buf(wstr.size());
+	std::use_facet<std::ctype<wchar_t>>(defaultLocale).narrow(wstr.data(), wstr.data() + wstr.size(), '?', buf.data());
+	utf8str = string(buf.data(), buf.size());
+}
+
 // Removes trailing '\r', fust in case we're reading a Windows text file in Linux
 inline void removeReturnChar(string& line)
 {
@@ -171,6 +191,7 @@ IniMap readIni(const string& iniPath)
 	while (std::getline(iniFile, line))
 	{
 		removeReturnChar(line);
+		utf8ToString(line);
 		StrPair entry;
 		if (!parseSection(line, section) &&		// not a section
 			!section.empty() &&					// we already have a valid section
@@ -180,7 +201,7 @@ IniMap readIni(const string& iniPath)
 		}
 	}
 
-	return std::move(iniMap);
+	return iniMap;
 }
 
 // Reads the whole INI file contents (sections, keys and values) into a map for easy access
@@ -195,6 +216,7 @@ IniMultiMap readMultiIni(const string& iniPath)
 	while (std::getline(iniFile, line))
 	{
 		removeReturnChar(line);
+		utf8ToString(line);
 		// check section
 		if (parseSection(line, section))
 		{
@@ -212,7 +234,7 @@ IniMultiMap readMultiIni(const string& iniPath)
 		}
 	}
 
-	return std::move(iniMap);
+	return iniMap;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -246,7 +268,7 @@ StrMap readExifOutput(const string& path)
 			exifMap.insert(keyVal);
 	}
 
-	return std::move(exifMap);
+	return exifMap;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -411,7 +433,7 @@ StrMap getExifFields(const string& exiftool, const string& cachePath, const stri
 	string exifOutFile = cachePath + SLASH_CHAR + fileName + ".txt";
 
 	// uses exiftool to extract Exif values from raw file into 'FILENAME.txt' 
-	string exiftoolCmd = exiftool + " -t -m -q -q \"" + imageFileName + "\"";
+	string exiftoolCmd = exiftool + " -t -m -q \"" + imageFileName + "\"";
 	log << "\nCalling exiftool: " << exiftoolCmd << " > " << exifOutFile << std::endl;
 
 	// call exiftool, redirecting output to a text file
@@ -421,7 +443,7 @@ StrMap getExifFields(const string& exiftool, const string& cachePath, const stri
 	StrMap exifFields = readExifOutput(exifOutFile);
 	remove(exifOutFile.c_str());
 
-	return std::move(exifFields);
+	return exifFields;
 }
 
 // Shows the keys and values from the Exif field map: opens text editor with Exif fields listed in key=value format
@@ -674,7 +696,7 @@ StrSetVector getPartialProfilesMatches(const IniMap& rtSelectorIni, const IniMul
 		}	
 	}
 
-	return std::move(partialProfiles);
+	return partialProfiles;
 }
 
 
@@ -999,6 +1021,13 @@ int main(int argc, const char* argv[])
 
 	// reads profile selection configuration file
 	IniMap rtSelectorIni = readIni(basePath + "RTProfileSelector.ini");
+
+	// if necessary, a specific locale can be set for reading INI-files (converting UTF-8 to single-byte char strings)
+	// (ex: DefaultLocale=.1252)
+	string defaultLocaleName = rtSelectorIni[RTPS_INI_SECTION_GENERAL]["DefaultLocale"];
+	if (!defaultLocaleName.empty())
+		defaultLocale = std::locale(defaultLocaleName);
+
 	// reads RT's params for profile selection
 	IniMap rtProfileParams = readIni(argv[1]);
 
