@@ -727,7 +727,10 @@ bool getRulesPartialProfiles(   const string& basePath, const string& rtCustomPr
 			if (copyAllSections ||											// all sections are to be copied
 				filterSections.find(section.first) != filterSections.end())	// filter => copy only enabled sections
 			{
-				partialProfile[section.first] = std::move(section.second);	// transfer whole section to destination profile
+				// new behaviour (issue #2): only existing values from correspending keys will be overwriten
+				auto& sectionMap = partialProfile[section.first];
+				for (auto entry : section.second)
+					sectionMap[entry.first] = entry.second;
 			}
 		}
 	}
@@ -956,27 +959,57 @@ void applyPartialProfiles(  const string& basePath, const string& rtCustomProfil
 	string tempFileName = profileFileName + ".tmp";
 	std::ofstream tempFile(tempFileName);
 	std::ifstream profileFile(profileFileName);
+	StrMap partialSection;
 	string line, section;
 	while (std::getline(profileFile, line))
 	{
 		removeReturnChar(line);
 		if (parseSection(line, section))				// it's a section
 		{
+			// new section detected => dumps entries (if any) from previous "partial section" 
+			for (auto& entry : partialSection)
+				tempFile << entry.first << "=" << entry.second << "\n";		// key=value
+			partialSection.clear();
+
 			// looks for a section of the same name in the partial profile
 			auto sectionFromPartial = partialProfile.find(section);
 			if (sectionFromPartial != partialProfile.end())
 			{	
-				// prevents any entries from original section from being copied
-				section.clear();
-				continue;
+				// new behaviour (issue #2): "partial" section from partial profile will be merged into existing section
+				partialSection = sectionFromPartial->second;
+				partialProfile.erase(sectionFromPartial);
 			}
 		}
 		if (!section.empty())
-			tempFile << line << "\n";	// copy original line to output
+		{
+			// if there's a corresponding partial section
+			if (!partialSection.empty())
+			{
+				StrPair entry;
+				if (parseEntry(line, entry))
+				{	
+					// current line is valid entry
+					auto iter = partialSection.find(entry.first);
+					if (iter != partialSection.end())
+					{
+						// new behaviour (issue #2): current key found in partial section => use its value instead
+						tempFile << iter->first << "=" << iter->second << "\n";
+						partialSection.erase(iter);
+						continue;
+					}
+				}
+			}
+			// copy original line to output
+			tempFile << line << "\n";	
+		}
 	}
+	// dumps entries (if any) remaining from current "partial section" 
+	for (auto& entry : partialSection)
+		tempFile << entry.first << "=" << entry.second << "\n";		// key=value
+
 	tempFile << "\n";
 
-	// insert sections from partial profile
+	// insert remaining sections from partial profile
 	for (auto& section : partialProfile)
 	{
 		tempFile << "[" << section.first << "]\n";						// [section name]
