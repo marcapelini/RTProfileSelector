@@ -2,7 +2,7 @@
 
 All:
 	@echo "----------Building project:[ RTProfileSelector - Release ]----------"
-	@$(MAKE) -f  "RTProfileSelector.mk"
+	@"$(MAKE)" -f  "RTProfileSelector.mk"
 clean:
 	@echo "----------Cleaning project:[ RTProfileSelector - Release ]----------"
-	@$(MAKE) -f  "RTProfileSelector.mk" clean
+	@"$(MAKE)" -f  "RTProfileSelector.mk" clean
