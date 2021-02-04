@@ -55,13 +55,13 @@ using std::string;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-// struct to store value and source file infor for INI keys
+// struct for storing value and source file info for INI keys
 struct IniValue
 {
 	string value;	
 	string source;
 	
-	// some convenience operators to work wit strings
+	// some convenience operators to work with strings
 	string& operator=(const string& s) { value = s; return value;}	
 	operator const string&() const { return value; }
 	bool operator==(const string& s) const { return value == s; }
@@ -94,7 +94,7 @@ std::locale defaultLocale;
 #ifdef _WIN32
 // Slash char for Windows
 #define SLASH_CHAR				'\\'	
-#define REVERSE_SLASH_CHAR				'/'	
+#define REVERSE_SLASH_CHAR		'/'	
 // Out of convenience, for Windows we assume the user may have copied the exiftool binary to RTProfileSelector's folder
 #define DEFAULT_EXIFTOOL_CMD	(basePath + "exiftool")
 // Default text viewer for Windows = Notepad
@@ -102,7 +102,7 @@ std::locale defaultLocale;
 #else
 // Slash char for *nix
 #define SLASH_CHAR				'/'
-#define REVERSE_SLASH_CHAR				'\\'	
+#define REVERSE_SLASH_CHAR		'\\'	
 // Exiftool is simply exiftool
 #define DEFAULT_EXIFTOOL_CMD	("exiftool")
 // Default text viewer for Ubuntu = Gedit
@@ -310,7 +310,7 @@ inline string trimLeft(const string& s)
 }
 
 // Evaluates a string as a double.  
-// Tries to perform a division operation if "/" is found, so that we can convert Exif exposure values
+// Attempts to perform a division operation if "/" is found, so that we can convert Exif exposure values
 // such as in "Exposure Time=1/1300"
 double eval(const string& str, double defaultValue)
 {
@@ -409,7 +409,7 @@ bool copyFile(const string& srcPath, const string& destPath)
 	return true;	// no error checking...
 }
 
-// Lauches a process, optionally redirecting output and waiting for termination
+// Launches a process, optionally redirecting output and waiting for termination
 // Note: this is bad and ugly, I wanted to have as little OS-specific code as possible, but on Windows
 // the call to system() always flashes a nagging console window, so had to resort to CreateProcess()
 void executeProcess(const string& cmdline, const string& redirectFile, bool waitForTermination)
@@ -585,7 +585,7 @@ IniMultiMap::const_iterator matchExifFields(const IniMultiMap &rtSelectorRulesIn
 		size_t privateKeys = 0;								// private RTPS keys begin with '@'
 		for (const IniEntry &keyVal : section->second)		// checks all keys in the current section
 		{
-			if (keyVal.first[0] == RTPS_RULES_PRIVATE_KEY_CHAR)				// skip private RTPS Keys
+			if (keyVal.first[0] == RTPS_RULES_PRIVATE_KEY_CHAR)		// skip private RTPS Keys
 			{
 				++privateKeys;
 				continue;
@@ -605,7 +605,7 @@ IniMultiMap::const_iterator matchExifFields(const IniMultiMap &rtSelectorRulesIn
 	{
 		// sorts matching sections so that we can pick up the one with most keys
 		std::sort(begin(matches), end(matches),
-			[](const IniMultiMap::const_iterator& prof1, const IniMultiMap::const_iterator& prof2)->bool
+			[](const IniMultiMap::const_iterator& prof1, const IniMultiMap::const_iterator& prof2) -> bool
 			{
 				return prof1->second.size() > prof2->second.size();
 			}
@@ -656,7 +656,7 @@ StrSetVector getPartialProfilesMatches(const IniMap& rtSelectorIni, const IniMul
 	{
 		// sorts matching profiles according to rank
 		std::sort(begin(matches), end(matches),
-			[](const IniMultiMap::const_iterator& prof1, const IniMultiMap::const_iterator& prof2)->bool
+			[](const IniMultiMap::const_iterator& prof1, const IniMultiMap::const_iterator& prof2) -> bool
 			{
 				auto rankIter1 = prof1->second.find(RTPS_RULES_PROFILE_RANK);
 				auto rankIter2 = prof2->second.find(RTPS_RULES_PROFILE_RANK);
@@ -699,7 +699,7 @@ StrSetVector getPartialProfilesMatches(const IniMap& rtSelectorIni, const IniMul
 					pp3Sections.insert(section);
 					break;
 				}
-				// its an expansion list section: retrieve actual list from RTProfileSelector.ini
+				// an expansion list section: retrieve actual list from RTProfileSelector.ini
 				else if (section[0] == '[' && section[section.length()-1] == ']')	
 				{
 					IniMap::const_iterator sectionsIter = rtSelectorIni.find(section.substr(1, section.length()-2));
@@ -707,7 +707,7 @@ StrSetVector getPartialProfilesMatches(const IniMap& rtSelectorIni, const IniMul
 					{
 						for (auto &entry : sectionsIter->second)
 						{
-							if (entry.second.value == "1")				// section is enabled?
+							if (entry.second.value == "1")			// section is enabled?
 								pp3Sections.insert(entry.first);	// add to profile
 						}
 					}
@@ -726,10 +726,10 @@ StrSetVector getPartialProfilesMatches(const IniMap& rtSelectorIni, const IniMul
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Functions for application of partial profiles after the default profile has  been selected
+// Functions for applying partial profiles after the default profile has been selected
 //
 
-// fills profile sections from rules-based partial profiles
+// Fills profile sections from rules-based partial profiles
 bool getRulesPartialProfiles(   std::ostream& log, 
 								const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, 
 								const StrMap& exifFields, const StrSetVector& partialProfilesList, IniMap& partialProfile)
@@ -766,7 +766,7 @@ bool getRulesPartialProfiles(   std::ostream& log,
 	return true;
 }
 
-// fills profile sections from ISO-based profiles
+// Fills profile sections from ISO-based profiles
 bool getISOPartialProfile(std::ostream& log, const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, const StrMap& exifFields, IniMap& partialProfile)
 {
 	// let's find camera model and ISO setting 
@@ -851,7 +851,7 @@ bool getISOPartialProfile(std::ostream& log, const string& basePath, const strin
 }
 
 
-// Try to get a distortion amount for the current lens and focal length, based on our simple 
+// Attempts to calculate a distortion amount for the current lens and focal length, based on our simple 
 // "lens profile" INI file
 bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrMap& exifFields, IniMap& partialProfile)
 {
@@ -986,9 +986,10 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 
 // Applies partial profiles to the selected destination profile
 // Currently partial information can be filled in from partial rules, lens-based distortion profile, or Camera/ISO based partial profiles
-void applyPartialProfiles(  std::ostream& log, 
+bool applyPartialProfiles(  std::ostream& log, 
 							const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, 
-							const StrMap& exifFields, const StrSetVector& partialProfilesList, const string& profileFileName)
+							const StrMap& exifFields, const StrSetVector& partialProfilesList, 
+							const string& baseProfileFileName, const string& outputProfileFileName)
 {
 	// map of partial settings 
 	IniMap partialProfile;
@@ -1010,25 +1011,33 @@ void applyPartialProfiles(  std::ostream& log,
 	// sections merged from partial profile
 	std::set<string> mergedPP3Sections;
 	
-	// inputy & output files
-	std::ifstream profileFile(profileFileName);
-	string tempFileName = profileFileName + ".tmp";
-	std::ofstream tempFile(tempFileName);
-	std::ofstream debugFile(basePath + "LastPP3Debug.txt");
+	// input & output files
+	std::ifstream profileFile(baseProfileFileName);
+	if (!profileFile.good())
+	{
+		log << "\nError opening base profile file: " << baseProfileFileName << std::endl;
+		return false;
+	}
+	
+	// output streams for profile generation and debugging
+	std::ostringstream tempStream;
+	std::ostringstream debugStream;
+	
+	debugStream << "; Base profile file: " << baseProfileFileName << "\n\n";
 	
 	// lambda for writing entry to destination & debug files
 	auto writeEntry = [&](IniEntry entry)
 	{
-		tempFile << entry.first << "=" << entry.second.value << "\n";		// key=value
-		debugFile << "; source: " << entry.second.source << "\n";		// print source PP3 file for each entry
-		debugFile << entry.first << "=" << entry.second.value << "\n";		// key=value
+		tempStream << entry.first << "=" << entry.second.value << "\n";		// key=value
+		debugStream << "; source: " << entry.second.source << "\n";			// print source PP3 file for each entry
+		debugStream << entry.first << "=" << entry.second.value << "\n";	// key=value
 	};
 
 	// lambda for writing non-entry line to destination & debug files
 	auto writeLine = [&](const string& line = "")
 	{
-		tempFile << line << "\n";
-		debugFile << line<< "\n";
+		tempStream << line << "\n";
+		debugStream << line<< "\n";
 	};
 
 	// parse sections & entries from "full" profile file
@@ -1060,7 +1069,7 @@ void applyPartialProfiles(  std::ostream& log,
 			IniEntry entry;
 			if (parseEntry(line, entry))
 			{	
-				entry.second.source = profileFileName;
+				entry.second.source = baseProfileFileName;
 				// current line is a valid entry: check if current partial section contains the key
 				auto iter = partialSection.find(entry.first);
 				if (iter != partialSection.end())
@@ -1094,19 +1103,44 @@ void applyPartialProfiles(  std::ostream& log,
 		writeLine();
 	}
 
-	// replaces original profile file with the temp file where one we applied the corrected distortion amount
-	tempFile.close();
 	profileFile.close();
 
-	remove(profileFileName.c_str());
-	rename(tempFileName.c_str(), profileFileName.c_str());
+	// save generated profile to temp file
+	string tempFileName = outputProfileFileName + ".tmp";
+	std::ofstream tempFile(tempFileName);
+	if (!tempFile.good())
+	{
+		log << "\nError creating temporary output profile file: " << tempFileName << std::endl;
+		return false;
+	}
+	tempFile << tempStream.str();	
+	tempFile.close();
+
+	// replace destination file (if any) with generated profile
+	remove(outputProfileFileName.c_str());	
+	if (rename(tempFileName.c_str(), outputProfileFileName.c_str()) != 0)
+	{
+		log << "\nError renaming temp file to destination file: \n" 
+			<< " " << tempFileName << " -> " << std::endl;
+		return false;
+	}
+	
+	// we don't really care if the debug file was succesfuly saved or not 
+	// there might be problems with non-exclusive access to the file in case multiple 
+	// instances of RTPS are executed simultaneously, but the debug file is really only 
+	// meant to be used for profiles & rules tuning and debugging, which only makes sense 
+	// for a single image at a time...  
+	std::ofstream debugFile(basePath + "LastPP3Debug.txt");
+	debugFile << debugStream.str();
+	
+	return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // 
 // The main program
 //
-// Usage: RTProfileSelector <RT's params file for profile selection>
+// Usage: RTProfileSelector <RawTherapee params file for profile selection>
 //
 int main(int argc, const char* argv[])
 {
@@ -1118,13 +1152,12 @@ int main(int argc, const char* argv[])
 	else
 		basePath = basePath.substr(0, slash + 1);
 
-	// just for simple logging/debugging
+	// for simple logging/debugging
 	std::ofstream log(basePath + "RTProfileSelector.log");
 
 	if (argc < 2)
 	{
-		// not enough parameters
-		log << "\nNot enough parameters" << std::endl;
+		log << "\nToo few arguments" << std::endl;
 		return 1;
 	}
 
@@ -1213,17 +1246,15 @@ int main(int argc, const char* argv[])
 		partialProfilesList = getPartialProfilesMatches(rtSelectorIni, rtSelectorRulesIni, exifFields, useComplexRules);
 	}
 
-	// copy matching profile as the raw file's RT profile
-	if (!copyFile(sourceProfile, outputProfileFileName))
-	{
-		log << "\nError copying source -> destination profile:" << std::endl;
-		log << sourceProfile << " -> " << outputProfileFileName << std::endl;
-		return 1;
-	}
-	log << "\nSuccessfuly copied  profile:" << sourceProfile << " -> " << outputProfileFileName << std::endl;
+	// matching basic profile selected
+	log << "\nBase profile file selected: " << sourceProfile << std::endl;
 
 	// last step: apply any partial profiles (partial rules, lens or ISO-dependent) 
-	applyPartialProfiles(log, basePath, rtCustomProfilesPath, rtSelectorIni, exifFields, partialProfilesList, outputProfileFileName);
+	if (!applyPartialProfiles(log, basePath, rtCustomProfilesPath, rtSelectorIni, exifFields, partialProfilesList, sourceProfile, outputProfileFileName))
+	{
+		log << "\nError applying rules - operation aborted!" << std::endl;
+		return 1;
+	}
 
 	// if ViewPP3Debug is enabled, show PP3 debug text file
 	if (rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ViewPP3Debug"] == "1")
