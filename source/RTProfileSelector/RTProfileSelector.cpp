@@ -394,6 +394,23 @@ string convertoToCurrentOSPath(const string& path)
 	return result;
 }
 
+// Replaces reserved (forbidden) characters with space (' ') so as to create a valid file name according to the target OS
+string safeFileName(const string& str)
+{
+	string safeStr = str;
+	std::replace_if(safeStr.begin(), safeStr.end(),
+		[](char c) -> bool
+		{
+#ifdef _WIN32
+			static const string reservedChars = "<>:\"/\\|?";
+#else
+			static const string reservedChars = "/";
+#endif
+			return reservedChars.find(c) != string::npos;
+		}, '_');
+	return safeStr;
+}
+
 // Copies the contents of a source file to a destination file
 bool copyFile(const string& srcPath, const string& destPath)
 {
@@ -431,7 +448,8 @@ void executeProcess(const string& cmdline, const string& redirectFile, bool wait
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 	}
-	CloseHandle(hfile);
+	if (hfile != 0)
+		CloseHandle(hfile);
 #else
 	string cmd = cmdline;
 	if (!redirectFile.empty())
@@ -770,11 +788,11 @@ bool getRulesPartialProfiles(   std::ostream& log,
 bool getISOPartialProfile(std::ostream& log, const string& basePath, const string& rtCustomProfilesPath, const IniMap& rtSelectorIni, const StrMap& exifFields, IniMap& partialProfile)
 {
 	// let's find camera model and ISO setting 
-	StrMap::const_iterator cameraModelIter = exifFields.find(EXIF_CAMERA_MODEL);
+	auto cameraModelIter = exifFields.find(EXIF_CAMERA_MODEL);
 	if (cameraModelIter == exifFields.cend())
 		return false;
 
-	StrMap::const_iterator isoIter = exifFields.find(EXIF_ISO);
+	auto isoIter = exifFields.find(EXIF_ISO);
 	if (isoIter == exifFields.cend())
 		return false;
 
@@ -784,12 +802,12 @@ bool getISOPartialProfile(std::ostream& log, const string& basePath, const strin
 		return false;
 
 	// ini with ISO-pp3 profile associations for current camera
-	IniMap isoProfileIni = readIni(basePath + ISO_PROFILE_DIR + SLASH_CHAR + "iso." + cameraModelIter->second + ".ini");
+	IniMap isoProfileIni = readIni(basePath + ISO_PROFILE_DIR + SLASH_CHAR + "iso." + safeFileName(cameraModelIter->second) + ".ini");
 	if (isoProfileIni.empty())
 		return false;
 
 	// ISO-pp3 association section within camera ini file
-	IniMap::const_iterator isoProfileSection = isoProfileIni.find("Profiles");
+	auto isoProfileSection = isoProfileIni.find("Profiles");
 	if (isoProfileSection == isoProfileIni.cend() || isoProfileSection->second.empty())
 		return false;
 
@@ -828,7 +846,7 @@ bool getISOPartialProfile(std::ostream& log, const string& basePath, const strin
 
 	// user may also have declared filter for which sections are to be copied
 	const EntryMap* isoSections = nullptr;
-	IniMap::const_iterator isoSectionsIter = rtSelectorIni.find(RTPS_INI_SECTION_ISO);
+	auto isoSectionsIter = rtSelectorIni.find(RTPS_INI_SECTION_ISO);
 	if (isoSectionsIter != rtSelectorIni.cend())
 		isoSections = &isoSectionsIter->second;
 		
@@ -859,7 +877,7 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 	IniMap lensProfileIni;
 
 	// let's get the lens ID first from Exif
-	StrMap::const_iterator lensIdIter = exifFields.find(EXIF_LENS_ID);
+	auto lensIdIter = exifFields.find(EXIF_LENS_ID);
 
 	// I noticed there's also a "Lens Type" field, don't know which is best or standard
 	if (lensIdIter == exifFields.cend())		
@@ -873,7 +891,7 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 	while (lensProfileIni.empty())
 	{
 		// look for lens' INI file: ./Lens Profiles/lens.<Lens ID>.ini
-		lensFileName = basePath + LENS_PROFILE_DIR + SLASH_CHAR + "lens." + lensIdIter->second + ".ini";
+		lensFileName = basePath + LENS_PROFILE_DIR + SLASH_CHAR + "lens." + safeFileName(lensIdIter->second) + ".ini";
 		if (lensIdIter != exifFields.cend())
 			lensProfileIni = readIni(lensFileName);
 		if (lensProfileIni.empty())
@@ -893,7 +911,7 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 	log << "Checking lens ini file: " << lensFileName << "...\n";			
 
 	// look for RT's [LensProfile] section
-	IniMap::iterator lensProfileSection = lensProfileIni.find(PP3_LENS_PROFILE_SECTION);
+	auto lensProfileSection = lensProfileIni.find(PP3_LENS_PROFILE_SECTION);
 	if (lensProfileSection != lensProfileIni.cend() && !lensProfileSection->second.empty())
 	{
 		auto lcpfile = lensProfileSection->second.find(PP3_LENS_PROFILE_KEY);
@@ -905,7 +923,7 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 	}
 
 	// locate [Distortion] section
-	IniMap::const_iterator lensDistortionSection = lensProfileIni.find(PP3_DISTORTION_SECTION);
+	auto lensDistortionSection = lensProfileIni.find(PP3_DISTORTION_SECTION);
 	if (lensDistortionSection == lensProfileIni.cend() || lensDistortionSection->second.empty())
 	{
 		log << "Error: file does not contain [" << PP3_DISTORTION_SECTION << "] section\n";			
@@ -915,7 +933,7 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 	// now looks for focal length
 	// note: for Panasonic GM1 raw file I noticed exiftool outputs two lines as "Focal Length" 
 	// but since we're using a std::map, only the first occurrence will be preserved
-	StrMap::const_iterator focalLengthIter = exifFields.find(EXIF_FOCAL_LENGTH);
+	auto focalLengthIter = exifFields.find(EXIF_FOCAL_LENGTH);
 	if (focalLengthIter == exifFields.cend())
 	{
 		log << "Error: EXIF does not contain \"" << EXIF_FOCAL_LENGTH << "\" field\n";				
@@ -979,7 +997,8 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 	std::stringstream ss;
 	ss << std::setiosflags(std::ios::fixed) << std::setprecision(3) << amount;
 	partialProfile[PP3_DISTORTION_SECTION][PP3_DISTORTION_AMOUNT] = { ss.str(), "calculated from " + lensFileName };	
-	log << "Success: calculated distortion value = " << ss.str() << "\n";	
+	log << "Processed lens distortion info file : " << lensFileName << "\n";
+	log << "Calculated distortion value = " << ss.str() << "\n";	
 
 	return true;
 }
