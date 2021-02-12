@@ -1149,7 +1149,7 @@ bool applyPartialProfiles(  std::ostream& log,
 	// instances of RTPS are executed simultaneously, but the debug file is really only 
 	// meant to be used for profiles & rules tuning and debugging, which only makes sense 
 	// for a single image at a time...  
-	std::ofstream debugFile(basePath + "LastPP3Debug.txt");
+	std::ofstream debugFile(basePath + "LastProfileDebug.txt");
 	debugFile << debugStream.str();
 	
 	return true;
@@ -1207,9 +1207,15 @@ int main(int argc, const char* argv[])
 	slash = defaultProcParams.find_last_of(SLASH_CHAR);
 
 	// all parameters found in RT's parameter file?
-	if (slash == string::npos || imageFileName.empty() || outputProfileFileName.empty() || cachePath.empty() || defaultProcParams.empty())
+	if (imageFileName.empty() || outputProfileFileName.empty() || cachePath.empty() || defaultProcParams.empty())
 	{
-		log << "\nInvalid RT ini params file:" << argv[1] << std::endl;
+		log << "\nInvalid RT ini params file: " << argv[1] << std::endl;
+		return 1;
+	}
+
+	if (slash == string::npos)
+	{
+		log << "\nRT misconfigured: default profile *must* be custom, not a bundled one (" << defaultProcParams << ")" << std::endl;
 		return 1;
 	}
 
@@ -1276,8 +1282,8 @@ int main(int argc, const char* argv[])
 	}
 
 	// if ViewPP3Debug is enabled, show PP3 debug text file
-	if (rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ViewPP3Debug"] == "1")
-		executeProcess(exifViewerCmd + " \"" + basePath + "LastPP3Debug.txt" + "\"", "", false);			
+	if (rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ViewProfileDebug"] == "1")
+		executeProcess(exifViewerCmd + " \"" + basePath + "LastProfileDebug.txt" + "\"", "", false);			
 
 	return 0;
 }
