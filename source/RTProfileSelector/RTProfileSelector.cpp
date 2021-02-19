@@ -891,9 +891,11 @@ bool getLensPartialProfile(std::ostream& log, const string& basePath, const StrM
 	while (lensProfileIni.empty())
 	{
 		// look for lens' INI file: ./Lens Profiles/lens.<Lens ID>.ini
-		lensFileName = basePath + LENS_PROFILE_DIR + SLASH_CHAR + "lens." + safeFileName(lensIdIter->second) + ".ini";
 		if (lensIdIter != exifFields.cend())
+		{
+			lensFileName = basePath + LENS_PROFILE_DIR + SLASH_CHAR + "lens." + safeFileName(lensIdIter->second) + ".ini";				
 			lensProfileIni = readIni(lensFileName);
+		}
 		if (lensProfileIni.empty())
 		{
 			if (triedCameraModel)
