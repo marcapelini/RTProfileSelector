@@ -461,7 +461,33 @@ void executeProcess(const string& cmdline, const string& redirectFile, bool wait
 #endif
 }
 
-// Extracts Exif fields from an image file into a map of keys/values
+void copyKeys(StrMap& exifFields, const IniMap& rtProfileParams, const string& section, const string& scope = "")
+{
+	std::string preffix = scope.empty() ? "" : scope + "."; 
+	auto iter = rtProfileParams.find(section);
+	if (iter != rtProfileParams.end())
+	{
+		for (auto keyval: iter->second)
+		{
+			if (keyval.second == "$subdir")
+				copyKeys(exifFields, rtProfileParams, section + "/" + keyval.first, preffix + keyval.first);
+			else
+				exifFields[preffix + keyval.first] = keyval.second;
+		}
+	}	
+}
+
+// Extracts Exif fields from RawTherapee key file params
+StrMap getParamsExifFields(const IniMap& rtProfileParams, std::ofstream& log)
+{
+	StrMap exifFields;
+	copyKeys(exifFields, rtProfileParams, "Common Data", "CommonData");
+	copyKeys(exifFields, rtProfileParams, "EXIF");
+	return exifFields;
+}
+
+
+// Extracts Exif fields from an image file into a map, using exiftool
 StrMap getExifFields(const string& exiftool, const string& cachePath, const string& imageFileName, std::ofstream& log)
 {
 	// output file named for the image file
@@ -488,23 +514,22 @@ StrMap getExifFields(const string& exiftool, const string& cachePath, const stri
 	return exifFields;
 }
 
-// Shows the keys and values from the Exif field map: opens text editor with Exif fields listed in key=value format
-void showExifFields(StrMap exifFields, const string& textViewer, const string& imageFileName, const string& outputFile)
+// Saves the keys and values to a file containing a list of "key=value" lines that cam be directly copied to a rules file
+void saveExifFields(const StrMap& exifFields, const string& imageFileName, const string& outputFile, const string& textViewer, bool showTextFile)
 {
 	remove(outputFile.c_str());
 
 	// writes fields as key=value lines
 	std::ofstream out(outputFile);
 
-	out << "You are seeing this file because ViewExifKeys is enabled in RTProfileSelector.ini.\n\n";
 	out << "Exif fields for image [" + imageFileName + "]:\n\n";
 
 	for (const auto& entry : exifFields)
 		out << entry.first << "=" << entry.second << "\n";
 	out.close();
 
-	// show file
-	executeProcess(textViewer + " \"" + outputFile + "\"", "", false);
+	if (showTextFile)
+		executeProcess(textViewer + " \"" + outputFile + "\"", "", false);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -1044,7 +1069,8 @@ bool applyPartialProfiles(  std::ostream& log,
 	std::ostringstream tempStream;
 	std::ostringstream debugStream;
 	
-	debugStream << "; Base profile file: " << baseProfileFileName << "\n\n";
+	debugStream << "; Base profile file: " << baseProfileFileName << "\n";
+	debugStream << "; Output profile file: " << outputProfileFileName << "\n\n";	
 	
 	// lambda for writing entry to destination & debug files
 	auto writeEntry = [&](IniEntry entry)
@@ -1154,6 +1180,9 @@ bool applyPartialProfiles(  std::ostream& log,
 	std::ofstream debugFile(basePath + "LastProfileDebug.txt");
 	debugFile << debugStream.str();
 	
+	std::ofstream profileCopyFile(basePath + "LastProfile.txt");
+	profileCopyFile << tempStream.str();	
+	
 	return true;
 }
 
@@ -1233,17 +1262,25 @@ int main(int argc, const char* argv[])
 		rtCustomProfilesPath = defaultProcParams.substr(0, slash);
 
 	// use exiftool to extract Exif values from raw file into 'exif.txt' 
-	string exiftool = rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ExifTool"];
-	if (exiftool.empty())
-		exiftool = DEFAULT_EXIFTOOL_CMD;
+	string exiftool;
+	if (rtSelectorIni[RTPS_INI_SECTION_GENERAL]["UseExifTool"] != "0")
+	{
+		exiftool = rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ExifTool"];
+		if (exiftool.empty())
+			exiftool = DEFAULT_EXIFTOOL_CMD;
+	}
 
 	// check whether a specific viewer is defined in the configuration file
 	string exifViewerCmd = rtSelectorIni[RTPS_INI_SECTION_GENERAL]["TextViewer"];
 	if (exifViewerCmd.empty())
 		exifViewerCmd = DEFAULT_TEXTVIEWER_CMD;
 
-	// reads Exif file into map 
-	StrMap exifFields = getExifFields(exiftool, cachePath, imageFileName, log);
+	// reads image Exif values into map (either extracted by exiftool or directly from RT keyfile) 
+	StrMap exifFields;
+	if (!exiftool.empty())
+		exifFields = getExifFields(exiftool, cachePath, imageFileName, log);
+	else
+		exifFields = getParamsExifFields(rtProfileParams, log);
 
 	// Exif-matched partial profiles list: 
 	// list of partial profiles that match the EXIF info for the current image
@@ -1254,11 +1291,9 @@ int main(int argc, const char* argv[])
 	}
 	else
 	{
-		// if ViewExifKeys is enabled,  KEY=VALUE text file will be generatet and opened 
-		// in a text editor so the user can easily copy the KEY=VALUE pairs for creating a 
-		// rule based on EXIF info for the current image file	
-		if (rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ViewExifKeys"] == "1")
-			showExifFields(exifFields, exifViewerCmd, imageFileName, cachePath + SLASH_CHAR + "exif_fields.txt");
+		// save the fields in a text file containing "key=value" lines, for easy copying to rules files
+		bool viewExifKeys = rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ViewExifKeys"] == "1";
+		saveExifFields(exifFields, imageFileName, basePath + "ExifFields.txt", exifViewerCmd, viewExifKeys);
 
 		// check all profile selection rules for a match against the Exif values
 		bool useComplexRules = rtSelectorIni[RTPS_INI_SECTION_GENERAL]["ComplexRulesEnabled"] != "0";
